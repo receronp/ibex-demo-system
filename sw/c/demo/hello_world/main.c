@@ -11,6 +11,23 @@
 
 #define USE_GPIO_SHIFT_REG 0
 
+int putcharUart1(int c) {
+  if (c == '\n') {
+    uart_out(UART_FROM_BASE_ADDR(UART1_BASE), '\r');
+  }
+  uart_out(UART_FROM_BASE_ADDR(UART1_BASE), c);
+
+  return c;
+}
+
+int putsUart1(const char* str) {
+  while (*str) {
+    putcharUart1(*str++);
+  }
+
+  return 0;
+}
+
 int main(void) {
   // This indicates how often the timer gets updated.
   timer_init();
@@ -32,6 +49,11 @@ int main(void) {
       // Print this to UART (use the screen command to see it).
       puts("I say hi using UART0! ");
       putchar('\n');
+
+      // Print this to UART (use the screen command to see it).
+      putsUart1("Student says hi using UART1! ");
+      putcharUart1('\n');
+
       // Re-enable interrupts with output complete
       set_global_interrupt_enable(1);
     }
