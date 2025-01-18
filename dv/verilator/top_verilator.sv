@@ -8,7 +8,7 @@ module top_verilator (input logic clk_i, rst_ni);
   localparam ClockFrequency = 50_000_000;
   localparam BaudRate       = 115_200;
 
-  logic uart_sys_rx, uart_sys_tx;
+  logic uart0_sys_rx, uart0_sys_tx, uart1_sys_rx, uart1_sys_tx;
 
   // Instantiating the Ibex Demo System.
   ibex_demo_system #(
@@ -22,10 +22,12 @@ module top_verilator (input logic clk_i, rst_ni);
     //Input
     .clk_sys_i (clk_i),
     .rst_sys_ni(rst_ni),
-    .uart_rx_i (uart_sys_rx),
+    .uart0_rx_i (uart0_sys_rx),
+    .uart1_rx_i (uart1_sys_rx),
 
     //Output
-    .uart_tx_o(uart_sys_tx),
+    .uart0_tx_o(uart0_sys_tx),
+    .uart1_tx_o(uart1_sys_tx),
 
     // tie off JTAG
     .trst_ni(1'b1),
@@ -43,15 +45,29 @@ module top_verilator (input logic clk_i, rst_ni);
     .spi_sck_o ( )
   );
 
-  // Virtual UART
+  // Virtual UART0
   uartdpi #(
     .BAUD(BaudRate),
-    .FREQ(ClockFrequency)
-  ) u_uartdpi (
+    .FREQ(ClockFrequency),
+    .NAME("uart0")
+  ) u_uartdpi0 (
     .clk_i,
     .rst_ni,
     .active (1'b1       ),
-    .tx_o   (uart_sys_rx),
-    .rx_i   (uart_sys_tx)
+    .tx_o   (uart0_sys_rx),
+    .rx_i   (uart0_sys_tx)
+  );
+
+  // Virtual UART1
+  uartdpi #(
+    .BAUD(BaudRate),
+    .FREQ(ClockFrequency),
+    .NAME("uart1")
+  ) u_uartdpi1 (
+    .clk_i,
+    .rst_ni,
+    .active (1'b1       ),
+    .tx_o   (uart1_sys_rx),
+    .rx_i   (uart1_sys_tx)
   );
 endmodule

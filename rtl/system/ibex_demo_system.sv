@@ -26,8 +26,10 @@ module ibex_demo_system #(
   input  logic [GpiWidth-1:0] gp_i,
   output logic [GpoWidth-1:0] gp_o,
   output logic [PwmWidth-1:0] pwm_o,
-  input  logic                uart_rx_i,
-  output logic                uart_tx_o,
+  input  logic                uart0_rx_i,
+  output logic                uart0_tx_o,
+  input  logic                uart1_rx_i,
+  output logic                uart1_tx_o,
   input  logic                spi_rx_i,
   output logic                spi_tx_o,
   output logic                spi_sck_o,
@@ -51,8 +53,8 @@ module ibex_demo_system #(
   localparam logic [31:0] DEBUG_MASK    = ~(DEBUG_SIZE-1);
 
   localparam logic [31:0] UART_SIZE     =  4 * 1024; //  4 KiB
-  localparam logic [31:0] UART_START    = 32'h80001000;
-  localparam logic [31:0] UART_MASK     = ~(UART_SIZE-1);
+  localparam logic [31:0] UART0_START    = 32'h80001000;
+  localparam logic [31:0] UART0_MASK     = ~(UART_SIZE-1);
 
   localparam logic [31:0] TIMER_SIZE    =  4 * 1024; //  4 KiB
   localparam logic [31:0] TIMER_START   = 32'h80002000;
@@ -66,6 +68,9 @@ module ibex_demo_system #(
   parameter logic [31:0] SPI_SIZE       =  1 * 1024; //  1 KiB
   parameter logic [31:0] SPI_START      = 32'h80004000;
   parameter logic [31:0] SPI_MASK       = ~(SPI_SIZE-1);
+
+  localparam logic [31:0] UART1_START    = 32'h80005000;
+  localparam logic [31:0] UART1_MASK     = ~(UART_SIZE-1);
 
   parameter logic [31:0] SIM_CTRL_SIZE  =  1 * 1024; //  1 KiB
   parameter logic [31:0] SIM_CTRL_START = 32'h20000;
@@ -85,19 +90,21 @@ module ibex_demo_system #(
     Ram,
     Gpio,
     Pwm,
-    Uart,
+    Uart0,
     Timer,
     Spi,
+    Uart1,
     SimCtrl,
     DbgDev
   } bus_device_e;
 
-  localparam int NrDevices = DBG ? 8 : 7;
+  localparam int NrDevices = DBG ? 9 : 8;
   localparam int NrHosts   = DBG ? 2 : 1;
 
   // Interrupts.
   logic timer_irq;
-  logic uart_irq;
+  logic uart0_irq;
+  logic uart1_irq;
 
   // Host signals.
   logic        host_req      [NrHosts];
@@ -156,12 +163,14 @@ module ibex_demo_system #(
   assign cfg_device_addr_mask[Gpio]    = GPIO_MASK;
   assign cfg_device_addr_base[Pwm]     = PWM_START;
   assign cfg_device_addr_mask[Pwm]     = PWM_MASK;
-  assign cfg_device_addr_base[Uart]    = UART_START;
-  assign cfg_device_addr_mask[Uart]    = UART_MASK;
+  assign cfg_device_addr_base[Uart0]    = UART0_START;
+  assign cfg_device_addr_mask[Uart0]    = UART0_MASK;
   assign cfg_device_addr_base[Timer]   = TIMER_START;
   assign cfg_device_addr_mask[Timer]   = TIMER_MASK;
   assign cfg_device_addr_base[Spi]     = SPI_START;
   assign cfg_device_addr_mask[Spi]     = SPI_MASK;
+  assign cfg_device_addr_base[Uart1]    = UART1_START;
+  assign cfg_device_addr_mask[Uart1]    = UART1_MASK;
   assign cfg_device_addr_base[SimCtrl] = SIM_CTRL_START;
   assign cfg_device_addr_mask[SimCtrl] = SIM_CTRL_MASK;
 
@@ -175,8 +184,9 @@ module ibex_demo_system #(
   assign device_err[Ram]     = 1'b0;
   assign device_err[Gpio]    = 1'b0;
   assign device_err[Pwm]     = 1'b0;
-  assign device_err[Uart]    = 1'b0;
+  assign device_err[Uart0]   = 1'b0;
   assign device_err[Spi]     = 1'b0;
+  assign device_err[Uart1]   = 1'b0;
   assign device_err[SimCtrl] = 1'b0;
 
   bus #(
@@ -277,7 +287,7 @@ module ibex_demo_system #(
     .irq_software_i(1'b0),
     .irq_timer_i   (timer_irq),
     .irq_external_i(1'b0),
-    .irq_fast_i    ({14'b0, uart_irq}),
+    .irq_fast_i    ({13'b0, uart1_irq, uart0_irq}),
     .irq_nm_i      (1'b0),
 
     .scramble_key_valid_i('0),
@@ -361,21 +371,41 @@ module ibex_demo_system #(
   uart #(
     .ClockFrequency ( ClockFrequency ),
     .BaudRate       ( BaudRate       )
-  ) u_uart (
+  ) u_uart_0 (
     .clk_i (clk_sys_i),
     .rst_ni(rst_sys_ni),
 
-    .device_req_i   (device_req[Uart]),
-    .device_addr_i  (device_addr[Uart]),
-    .device_we_i    (device_we[Uart]),
-    .device_be_i    (device_be[Uart]),
-    .device_wdata_i (device_wdata[Uart]),
-    .device_rvalid_o(device_rvalid[Uart]),
-    .device_rdata_o (device_rdata[Uart]),
+    .device_req_i   (device_req[Uart0]),
+    .device_addr_i  (device_addr[Uart0]),
+    .device_we_i    (device_we[Uart0]),
+    .device_be_i    (device_be[Uart0]),
+    .device_wdata_i (device_wdata[Uart0]),
+    .device_rvalid_o(device_rvalid[Uart0]),
+    .device_rdata_o (device_rdata[Uart0]),
 
-    .uart_rx_i,
-    .uart_irq_o     (uart_irq),
-    .uart_tx_o
+    .uart_rx_i      (uart0_rx_i),
+    .uart_irq_o     (uart0_irq),
+    .uart_tx_o      (uart0_tx_o)
+  );
+
+  uart #(
+    .ClockFrequency ( ClockFrequency ),
+    .BaudRate       ( BaudRate       )
+  ) u_uart_1 (
+    .clk_i (clk_sys_i),
+    .rst_ni(rst_sys_ni),
+
+    .device_req_i   (device_req[Uart1]),
+    .device_addr_i  (device_addr[Uart1]),
+    .device_we_i    (device_we[Uart1]),
+    .device_be_i    (device_be[Uart1]),
+    .device_wdata_i (device_wdata[Uart1]),
+    .device_rvalid_o(device_rvalid[Uart1]),
+    .device_rdata_o (device_rdata[Uart1]),
+
+    .uart_rx_i      (uart1_rx_i),
+    .uart_irq_o     (uart1_irq),
+    .uart_tx_o      (uart1_tx_o)
   );
 
   spi_top #(
